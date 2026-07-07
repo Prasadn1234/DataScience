@@ -52,7 +52,12 @@ class ContractVectorStore:
             ChromaDB collection
         """
 
-        collection = self.client.get_or_create_collection(name=name)
+        # ChromaDB defaults to L2 distance; force cosine so that
+        # similarity = 1 - distance (used in search()) is meaningful.
+        collection = self.client.get_or_create_collection(
+            name=name,
+            metadata={"hnsw:space": "cosine"},
+        )
 
         self.collections[name] = collection
         return collection

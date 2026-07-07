@@ -159,5 +159,56 @@ class ContractVectorStore:
         trace.update(output={"results_count": len(formatted)})
         return formatted
 
+    def search_with_filter(self, collection_name: str, query: str,
+                           filter_dict: Dict = None, n_results: int = 5) -> List[Dict]:
+        """
+        Semantic search with metadata filtering.
+
+        Args:
+            collection_name: Collection to search
+            query: Search query
+            filter_dict: Metadata filter (e.g., {"category": "master_agreements"})
+            n_results: Number of results
+
+        Returns:
+            Filtered search results
+        """
+
+        # Create trace for filtered search
+        trace = langfuse.trace(
+            name="semantic-search-filtered",
+            session_id=SESSION_ID,
+            input={"query": query, "collection": collection_name, "filter": filter_dict}
+        )
+
+        # Get collection
+        collection = self.collections.get(collection_name) or self.create_collection(collection_name)
+
+        # Generate query embedding
+        query_embedding = traced_embedding(query, "query-embedding-filtered")
+
+        # Query collection, applying the metadata filter only if one was given
+        # (chromadb rejects where=None/where={})
+        query_kwargs = {"query_embeddings": [query_embedding], "n_results": n_results}
+        if filter_dict:
+            query_kwargs["where"] = filter_dict
+        results = collection.query(**query_kwargs)
+
+        # Format results
+        formatted = []
+        result_docs = results.get("documents") or [[]]
+        result_metadatas = results.get("metadatas") or [[]]
+        result_distances = results.get("distances") or [[]]
+
+        for document, metadata, distance in zip(result_docs[0], result_metadatas[0], result_distances[0]):
+            formatted.append({
+                "document": document,
+                "metadata": metadata,
+                "similarity": 1 - distance,
+            })
+
+        trace.update(output={"results_count": len(formatted)})
+        return formatted
+
 
 print("ContractVectorStore class defined")

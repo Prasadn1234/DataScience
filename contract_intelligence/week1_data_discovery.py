@@ -144,7 +144,7 @@ if IN_COLAB:
     # (the latter was empty - that's why discovery returned 0 files before).
     DATA_DIR = Path("/content/drive/MyDrive/Datasets")
 else:
-    DATA_DIR = Path("../data")
+    DATA_DIR = Path("../dataset")
 
 # Run discovery
 contract_files = discover_contract_data(DATA_DIR)

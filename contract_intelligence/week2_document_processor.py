@@ -1,10 +1,6 @@
 # ============================================================================
 # WEEK 2.1: DOCUMENT PROCESSOR CLASS
 # ============================================================================
-#
-# Note: `process_category()` is mentioned in the class docstring's
-# "YOU MUST IMPLEMENT" list but wasn't part of the pasted skeleton, so it
-# isn't implemented here. Share that stub separately and it can be added.
 
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -155,6 +151,48 @@ class ContractDocumentProcessor:
             })
 
         return sections
+
+    def process_category(self, files: List[Path], category: str) -> List[Dict]:
+        """
+        Process all documents in a category with tracing.
+
+        Args:
+            files: List of file paths
+            category: Category name
+
+        Returns:
+            List of processed document dictionaries
+        """
+
+        # Create trace for this category
+        trace = langfuse.trace(
+            name=f"process-{category}",
+            session_id=SESSION_ID,
+            input={"category": category, "file_count": len(files)}
+        )
+
+        processed = []
+
+        # Loop through files and process each one
+        for file_path in files:
+            # Check if file format is supported
+            if file_path.suffix.lower() not in self.supported_formats:
+                continue
+
+            # Call load_docx with trace as parent
+            result = self.load_docx(file_path, trace_parent=trace)
+            if result is None:
+                continue
+
+            # Add category to result and append to processed list
+            result['category'] = category
+            processed.append(result)
+
+        # Update trace with results
+        trace.update(output={"processed_count": len(processed)})
+        self.processed_docs.extend(processed)
+
+        return processed
 
 
 print("ContractDocumentProcessor class defined")

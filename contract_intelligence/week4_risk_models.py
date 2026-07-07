@@ -78,3 +78,40 @@ class FinancialRiskAssessment(BaseModel):
 
 print("FinancialRiskAssessment model defined")
 print(f"Fields: {list(FinancialRiskAssessment.model_fields.keys())}")
+
+
+# ============================================================================
+# OPERATIONAL RISK ASSESSMENT MODEL
+# ============================================================================
+
+class OperationalRiskAssessment(BaseModel):
+    """
+    Structured output for operational risk analysis.
+    """
+
+    service_scope: str = Field(description="Summary of service scope")
+
+    # SLA requirements
+    sla_requirements: List[str] = Field(default_factory=list, description="Identified SLA requirements")
+
+    # Delivery risks
+    delivery_risks: List[str] = Field(default_factory=list, description="Identified delivery risks")
+
+    # Resource requirements
+    resource_requirements: str = Field(description="Summary of resource requirements")
+
+    # Dependency risks
+    dependency_risks: List[str] = Field(default_factory=list, description="Identified dependency risks")
+
+    # Mitigation strategies
+    mitigation_strategies: List[str] = Field(default_factory=list, description="Recommended mitigation strategies")
+
+    # Overall risk level
+    risk_level: str = Field(description="Overall risk level: LOW, MEDIUM, HIGH, CRITICAL")
+
+    # Confidence score
+    confidence: float = Field(ge=0.0, le=1.0, description="Model's confidence in this assessment, 0.0 to 1.0")
+
+
+print("OperationalRiskAssessment model defined")
+print(f"Fields: {list(OperationalRiskAssessment.model_fields.keys())}")

@@ -131,8 +131,10 @@ def analyze_parallel(self, contract_text: str, doc_id: str) -> Dict:
         for future in concurrent.futures.as_completed(futures):
             agent_type = futures[future]
             try:
-                agent_result = future.result()
-                results[agent_type] = agent_result['result']
+                # Store the full {'agent': ..., 'result': ...} dict returned by
+                # _execute_agent - _build_consensus/_calculate_composite_score
+                # expect to reach into result['result'].
+                results[agent_type] = future.result()
             except Exception as e:
                 print(f"Agent {agent_type.value} failed after retries: {e}")
                 results[agent_type] = None
@@ -171,3 +173,106 @@ def analyze_parallel(self, contract_text: str, doc_id: str) -> Dict:
 ContractRiskOrchestrator.analyze_parallel = analyze_parallel
 
 print("analyze_parallel() method added")
+
+
+# ============================================================================
+# WEEK 5.3: CONSENSUS BUILDING
+# ============================================================================
+
+def _build_consensus(self, results: Dict) -> Dict:
+    """
+    Build consensus from multiple agent results.
+
+    Args:
+        results: Dictionary of agent results ({RiskDimension: {'agent', 'result'} or None})
+
+    Returns:
+        Consensus dictionary with aggregated findings
+    """
+
+    consensus = {
+        'risk_levels': {},
+        'key_findings': [],
+        'all_recommendations': []
+    }
+
+    # Field per model that best summarizes its headline risk, for key_findings
+    highlight_field = {
+        'legal': 'liability_exposure',
+        'financial': 'financial_exposure',
+        'operational': 'service_scope',
+    }
+    # Different models name their remediation list differently
+    recommendation_fields = ('recommended_changes', 'mitigation_strategies')
+
+    # Extract risk level from each agent result
+    for dimension, result in results.items():
+        if result and 'result' in result and result['result']:
+            agent_name = result['agent']
+            inner = result['result']
+
+            risk_level = inner.get('risk_level')
+            consensus['risk_levels'][agent_name] = risk_level
+
+            field = highlight_field.get(agent_name)
+            if field and inner.get(field):
+                consensus['key_findings'].append(f"{agent_name}: {risk_level} risk - {inner[field]}")
+
+            # Aggregate recommendations from all agents
+            for rec_field in recommendation_fields:
+                consensus['all_recommendations'].extend(inner.get(rec_field, []))
+
+    # Flag when agents agree, since that's the strongest signal for common themes
+    levels_seen = list(consensus['risk_levels'].values())
+    if len(levels_seen) > 1 and len(set(levels_seen)) == 1:
+        consensus['key_findings'].append(f"All agents agree: {levels_seen[0]} risk")
+
+    return consensus
+
+# Add method to class
+ContractRiskOrchestrator._build_consensus = _build_consensus
+
+
+def _calculate_composite_score(self, results: Dict) -> float:
+    """
+    Calculate weighted composite risk score.
+
+    Args:
+        results: Dictionary of agent results ({RiskDimension: {'agent', 'result'} or None})
+
+    Returns:
+        Weighted composite score (1.0 to 4.0)
+
+    Formula:
+    composite = sum(weight * risk_score) for each agent
+    """
+
+    total_weight = 0
+    weighted_sum = 0
+
+    # Calculate weighted sum, skipping any dimension whose agent failed or
+    # returned an unrecognized risk level
+    for dimension in RiskDimension:
+        result = results.get(dimension)
+        if not result or not result.get('result'):
+            continue
+
+        risk_level = result['result'].get('risk_level')
+        score = self.risk_scores.get(risk_level)
+        if score is None:
+            continue
+
+        weight = self.risk_weights[dimension]
+        weighted_sum += weight * score
+        total_weight += weight
+
+    # Avoid division by zero
+    if total_weight == 0:
+        return 2.5  # Default to medium
+
+    return weighted_sum / total_weight
+
+# Add methods to class
+ContractRiskOrchestrator._calculate_composite_score = _calculate_composite_score
+
+print("Consensus methods added")

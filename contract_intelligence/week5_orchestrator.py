@@ -133,11 +133,12 @@ def analyze_parallel(self, contract_text: str, doc_id: str) -> Dict:
             try:
                 # Store the full {'agent': ..., 'result': ...} dict returned by
                 # _execute_agent - _build_consensus/_calculate_composite_score
-                # expect to reach into result['result'].
-                results[agent_type] = future.result()
+                # expect to reach into result['result']. Keyed by agent_type.value
+                # (a plain string) so results prints/iterates cleanly downstream.
+                results[agent_type.value] = future.result()
             except Exception as e:
                 print(f"Agent {agent_type.value} failed after retries: {e}")
-                results[agent_type] = None
+                results[agent_type.value] = None
 
     # Build consensus
     consensus = self._build_consensus(results)
@@ -184,7 +185,7 @@ def _build_consensus(self, results: Dict) -> Dict:
     Build consensus from multiple agent results.
 
     Args:
-        results: Dictionary of agent results ({RiskDimension: {'agent', 'result'} or None})
+        results: Dictionary of agent results ({str agent name: {'agent', 'result'} or None})
 
     Returns:
         Consensus dictionary with aggregated findings
@@ -238,7 +239,7 @@ def _calculate_composite_score(self, results: Dict) -> float:
     Calculate weighted composite risk score.
 
     Args:
-        results: Dictionary of agent results ({RiskDimension: {'agent', 'result'} or None})
+        results: Dictionary of agent results ({str agent name: {'agent', 'result'} or None})
 
     Returns:
         Weighted composite score (1.0 to 4.0)
@@ -253,7 +254,7 @@ def _calculate_composite_score(self, results: Dict) -> float:
     # Calculate weighted sum, skipping any dimension whose agent failed or
     # returned an unrecognized risk level
     for dimension in RiskDimension:
-        result = results.get(dimension)
+        result = results.get(dimension.value)
         if not result or not result.get('result'):
             continue
 

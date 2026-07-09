@@ -210,5 +210,43 @@ class ContractVectorStore:
         trace.update(output={"results_count": len(formatted)})
         return formatted
 
+    def search_traced(self, collection_name: str, query: str, n_results: int = 5) -> Dict:
+        """
+        Semantic search with Langfuse tracing, returning the raw ChromaDB
+        query result (documents/metadatas/distances as lists-of-lists),
+        for callers that want to work with the native chromadb shape
+        instead of search()'s flattened list of dicts.
+
+        Args:
+            collection_name: Collection to search
+            query: Search query text
+            n_results: Number of results to return
+
+        Returns:
+            Raw ChromaDB query result dict
+        """
+
+        # Create trace for search
+        trace = langfuse.trace(
+            name="semantic-search-traced",
+            session_id=SESSION_ID,
+            input={"query": query, "collection": collection_name}
+        )
+
+        # Get collection
+        collection = self.collections.get(collection_name) or self.create_collection(collection_name)
+
+        # Generate query embedding
+        query_embedding = traced_embedding(query, "query-embedding-traced")
+
+        # Query collection
+        results = collection.query(query_embeddings=[query_embedding], n_results=n_results)
+
+        result_docs = results.get("documents") or [[]]
+        result_count = len(result_docs[0]) if result_docs else 0
+        trace.update(output={"results_count": result_count})
+
+        return results
+
 
 print("ContractVectorStore class defined")

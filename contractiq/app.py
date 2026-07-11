@@ -8,69 +8,11 @@ import json
 import os
 
 import streamlit as st
-from anthropic import Anthropic
-from pydantic import BaseModel, Field
 
-MODEL = "claude-sonnet-5"
-
-
-class KeyDate(BaseModel):
-    description: str = Field(description="What the date represents, e.g. 'Effective date'")
-    date: str = Field(description="The date or deadline as written in the contract")
-
-
-class Obligation(BaseModel):
-    party: str = Field(description="The party responsible for the obligation")
-    obligation: str = Field(description="A concise description of what they must do")
-
-
-class RiskFlag(BaseModel):
-    clause: str = Field(description="Short quote or reference to the clause in question")
-    risk_level: str = Field(description="One of: low, medium, high")
-    explanation: str = Field(description="Why this clause is risky or unusual")
-
-
-class ContractAnalysis(BaseModel):
-    contract_type: str = Field(description="The type of agreement, e.g. 'NDA', 'MSA', 'Lease'")
-    parties: list[str] = Field(description="The parties entering into the contract")
-    summary: str = Field(description="A plain-language summary of the contract, 3-5 sentences")
-    key_dates: list[KeyDate] = Field(description="Important dates or deadlines in the contract")
-    obligations: list[Obligation] = Field(description="Key obligations owed by each party")
-    risks: list[RiskFlag] = Field(description="Clauses that are risky, unusual, or one-sided")
-    recommended_actions: list[str] = Field(description="Suggested next steps before signing")
-
-
-ANALYSIS_TOOL = {
-    "name": "record_contract_analysis",
-    "description": "Record a structured analysis of a contract.",
-    "input_schema": ContractAnalysis.model_json_schema(),
-}
+from analyzer import analyze_contract
+from models import ContractAnalysis
 
 RISK_COLOR = {"low": "🟢", "medium": "🟡", "high": "🔴"}
-
-
-def analyze_contract(contract_text: str, api_key: str) -> ContractAnalysis:
-    client = Anthropic(api_key=api_key)
-    response = client.messages.create(
-        model=MODEL,
-        max_tokens=4096,
-        tools=[ANALYSIS_TOOL],
-        tool_choice={"type": "tool", "name": "record_contract_analysis"},
-        messages=[
-            {
-                "role": "user",
-                "content": (
-                    "Analyze the following contract and call the "
-                    "record_contract_analysis tool with your findings.\n\n"
-                    f"Contract Text:\n{contract_text}"
-                ),
-            }
-        ],
-    )
-    for block in response.content:
-        if block.type == "tool_use" and block.name == "record_contract_analysis":
-            return ContractAnalysis.model_validate(block.input)
-    raise ValueError("Model did not return a structured analysis.")
 
 
 def render_analysis(analysis: ContractAnalysis) -> None:
